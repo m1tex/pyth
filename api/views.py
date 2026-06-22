@@ -41,7 +41,7 @@ def call_func(name: str, parameters: dict = None):
 
 
 def api_get_xcsrf(request):
-    data = { 'X-CSRF-Token': get_token(request) }
+    data = {'X-CSRF-Token': get_token(request)}
     return JsonResponse(data, safe=False, status=200)
 
 
@@ -70,13 +70,8 @@ def api_statuses(request):
     if request.method == 'GET':
         try:
             result = call_func('status_get')
-            formatted_result = []
-            for item in result:
-                formatted_result.append({
-                    'pk_status': item['pk_status'],
-                    'title': item['title']
-                })
-            return JsonResponse(formatted_result, safe=False, status=200)
+            formatted = [{'pk_status': r['pk_status'], 'title': r['title']} for r in result]
+            return JsonResponse(formatted, safe=False, status=200)
         except Exception as e:
             return JsonResponse({"error": str(e)}, safe=False, status=500)
     
@@ -99,10 +94,7 @@ def api_statuses(request):
             title = request.POST.get('title')
 
         if not title:
-            return JsonResponse(
-                {"error": "Название статуса обязательно"},
-                status=400
-            )
+            return JsonResponse({"error": "Название статуса обязательно"}, status=400)
 
         try:
             result = call_func('status_post', {'in_title': str(title)})
@@ -115,27 +107,69 @@ def api_statuses(request):
             return JsonResponse({"error": str(e)}, status=500)
 
 
+def api_payment_types(request):
+
+    if request.method == 'GET':
+        try:
+            result = call_func('payment_type_get')
+            formatted = [{'pk_payment_type': r['pk_payment_type'], 'title': r['title']} for r in result]
+            return JsonResponse(formatted, safe=False, status=200)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, safe=False, status=500)
+
+    if request.method == 'POST':
+        auth_result = is_auth(request)
+        if not auth_result:
+            return JsonResponse({"message": "Доступ запрещен"}, status=403)
+
+        user = auth_result
+        if not user.get('is_admin'):
+            return JsonResponse(
+                {"message": "Доступ запрещен. Только для администратора"},
+                status=403
+            )
+
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+            title = data.get('title')
+        else:
+            title = request.POST.get('title')
+
+        if not title:
+            return JsonResponse({"error": "Название способа оплаты обязательно"}, status=400)
+
+        try:
+            result = call_func('payment_type_post', {'in_title': str(title)})
+            return JsonResponse({
+                "message": "Способ оплаты успешно создан",
+                "pk_payment_type": result[0]["pk_payment_type"],
+                "title": title
+            }, status=201)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+
 def api_cars(request):
 
     if request.method == 'GET':
         try:
             result = call_func('car_get')
-            formatted_result = []
+            formatted = []
             for item in result:
-                formatted_result.append({
+                formatted.append({
                     'pk_car': item['pk_car'],
                     'brand': item['car_brand_title'],
                     'model': item['car_model_title']
                 })
-            return JsonResponse(formatted_result, safe=False, status=200)
+            return JsonResponse(formatted, safe=False, status=200)
         except Exception as e:
             return JsonResponse({"error": str(e)}, safe=False, status=500)
-    
+
     if request.method == 'POST':
         auth_result = is_auth(request)
         if not auth_result:
             return JsonResponse({"message": "Доступ запрещен"}, status=403)
-        
+
         user = auth_result
         if not user.get('is_admin'):
             return JsonResponse(
@@ -182,7 +216,7 @@ def api_applications(request):
     auth_result = is_auth(request)
     if not auth_result:
         return JsonResponse({"message": "Доступ запрещен"}, safe=False, status=403)
-    
+
     user = auth_result
 
     if request.method == 'GET':
@@ -197,46 +231,46 @@ def api_applications(request):
 
     if request.method == 'POST':
         errors = []
-        
+
         contact_info = request.POST.get('contact_info')
         address = request.POST.get('address')
         date = request.POST.get('date')
         time = request.POST.get('time')
-        payment_type = request.POST.get('fk_payment_type')
-        car_id = request.POST.get('fk_car')
-        
+        fk_payment_type = request.POST.get('fk_payment_type')
+        fk_car = request.POST.get('fk_car')
+
         date_pattern = re.compile(r'^\d{4}-\d{2}-\d{2}$')
         time_pattern = re.compile(r'^\d{2}:\d{2}(:\d{2})?$')
-        
-        if not contact_info: 
+
+        if not contact_info:
             errors.append("Поле 'Контактная информация' обязательно для заполнения.")
-        if not address: 
+        if not address:
             errors.append("Поле 'Адрес' обязательно для заполнения.")
-        if not date: 
+        if not date:
             errors.append("Поле 'Дата' обязательно для заполнения.")
-        elif not date_pattern.match(date): 
+        elif not date_pattern.match(date):
             errors.append("Некорректный формат даты. Используйте YYYY-MM-DD")
-        if not time: 
+        if not time:
             errors.append("Поле 'Время' обязательно для заполнения.")
-        elif not time_pattern.match(time): 
+        elif not time_pattern.match(time):
             errors.append("Некорректный формат времени. Используйте HH:MM:SS")
-        if not payment_type: 
+        if not fk_payment_type:
             errors.append("Поле 'Тип оплаты' обязательно для заполнения.")
-        if not car_id: 
+        if not fk_car:
             errors.append("Поле 'Автомобиль' обязательно для заполнения.")
-        
+
         if errors:
             return JsonResponse({"errors": errors}, safe=False, status=400)
-        
+
         try:
             result = call_func('application_post', {
                 'in_contact_info': contact_info,
                 'in_address': address,
                 'in_date': date,
                 'in_time': time,
-                'id_payment_type': int(payment_type),
+                'id_payment_type': int(fk_payment_type),
                 'id_user': user['pk_user'],
-                'id_car': int(car_id)
+                'id_car': int(fk_car)
             })
             new_id = result[0].get('pk_application') or list(result[0].values())[0]
             return JsonResponse({
@@ -245,14 +279,14 @@ def api_applications(request):
             }, safe=False, status=201)
         except Exception as e:
             return JsonResponse({"error": str(e)}, safe=False, status=500)
-    
+
     if request.method == 'PATCH':
         if not user.get('is_admin'):
             return JsonResponse(
                 {"message": "Доступ запрещен. Только для администратора"},
                 safe=False, status=403
             )
-        
+
         errors = []
         if request.content_type == 'application/json':
             data = json.loads(request.body)
@@ -263,14 +297,15 @@ def api_applications(request):
             pk_application = request.POST.get('pk_application') or request.GET.get('pk_application')
             pk_status = request.POST.get('pk_status') or request.GET.get('pk_status')
             reason = request.POST.get('reason') or request.GET.get('reason')
-        
+
         if not pk_application:
             errors.append("Не указан pk_application")
         if not pk_status:
             errors.append("Не указан pk_status")
+
         if errors:
             return JsonResponse({"errors": errors}, safe=False, status=400)
-        
+
         try:
             result = call_func('application_patch', {
                 'id_application': int(pk_application),
@@ -297,13 +332,13 @@ def api_applications(request):
 
 
 def api_users(request):
-    """Регистрация нового пользователя."""
+
     if is_auth(request):
         return JsonResponse({"message": "Вы уже авторизованы"}, safe=False, status=403)
-    
+
     if request.method == 'POST':
         errors = []
-        
+
         lastname = request.POST.get('lastname')
         firstname = request.POST.get('firstname')
         middlename = request.POST.get('middlename')
@@ -311,56 +346,56 @@ def api_users(request):
         password = request.POST.get('password')
         phone = request.POST.get('phone')
         email = request.POST.get('email')
-        
+
         name_pattern = re.compile(r'^[a-zA-Zа-яА-ЯёЁ\s\-]+$')
         email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
         phone_pattern = re.compile(r'^\+?[0-9\-\(\)\s]{7,15}$')
-        
+
         if not lastname:
             errors.append("Поле 'Фамилия' обязательно для заполнения.")
         elif len(lastname) < 2 or len(lastname) > 50:
             errors.append("Фамилия должна быть длиной от 2 до 50 символов.")
         elif not name_pattern.match(lastname):
             errors.append("Фамилия может содержать только буквы, пробелы и дефисы.")
-        
+
         if not firstname:
             errors.append("Поле 'Имя' обязательно для заполнения.")
         elif len(firstname) < 2 or len(firstname) > 50:
             errors.append("Имя должно быть длиной от 2 до 50 символов.")
         elif not name_pattern.match(firstname):
             errors.append("Имя может содержать только буквы, пробелы и дефисы.")
-        
+
         if middlename:
             if len(middlename) < 2 or len(middlename) > 50:
                 errors.append("Отчество должно быть длиной от 2 до 50 символов.")
             elif not name_pattern.match(middlename):
                 errors.append("Отчество может содержать только буквы, пробелы и дефисы.")
-        
+
         if not login:
             errors.append("Поле 'Логин' обязательно для заполнения.")
         elif len(login) < 4 or len(login) > 150:
             errors.append("Логин должен быть длиной от 4 до 150 символов.")
-        
+
         if not password:
             errors.append("Поле 'Пароль' обязательно для заполнения.")
         elif len(password) < 6 or len(password) > 128:
             errors.append("Пароль должен быть длиной от 6 до 128 символов.")
-        
+
         if not email:
             errors.append("Поле 'Email' обязательно для заполнения.")
         elif not email_pattern.match(email):
             errors.append("Некорректный формат email.")
         elif len(email) > 255:
             errors.append("Email должен быть короче 255 символов.")
-        
+
         if not phone:
             errors.append("Поле 'Номер телефона' обязательно для заполнения.")
         elif not phone_pattern.match(phone):
             errors.append("Некорректный формат номера телефона.")
-        
+
         if errors:
             return JsonResponse({"errors": errors}, status=400)
-        
+
         try:
             existing_by_login = call_func('user_get', {'in_search_value': login})
             existing_by_email = call_func('user_get', {'in_search_value': email})
@@ -370,10 +405,10 @@ def api_users(request):
                 }, status=409)
         except Exception:
             pass
-        
+
         hasher = PBKDF2PasswordHasher()
         hashed_password = hasher.encode(password, salt='extra', iterations=1200000)
-        
+
         try:
             result = call_func('user_post', {
                 'in_lastname': lastname,
@@ -391,33 +426,33 @@ def api_users(request):
             }, status=201)
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
-    
+
     return JsonResponse({"error": "Method not allowed"}, status=405)
 
 
 def api_auth(request):
-    """Авторизация пользователя."""
+
     if is_auth(request):
         return JsonResponse({"message": "Доступ запрещен"}, safe=False, status=403)
-    
+
     if request.method == 'POST':
         errors = []
         login = request.POST.get('login')
         password = request.POST.get('password')
-        
+
         if not login:
             errors.append("Поле 'Логин' обязательно для заполнения.")
         elif len(login) < 4 or len(login) > 150:
             errors.append("Логин должен быть длиной от 4 до 150 символов.")
-        
+
         if not password:
             errors.append("Поле 'Пароль' обязательно для заполнения.")
         elif len(password) < 6 or len(password) > 128:
             errors.append("Пароль должен быть длиной от 6 до 128 символов.")
-        
+
         if errors:
             return JsonResponse({"errors": errors}, status=400)
-        
+
         user_result = call_func('user_get', {'in_search_value': login})
         if user_result and len(user_result) > 0:
             user = user_result[0]
