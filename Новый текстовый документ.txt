@@ -1,0 +1,237 @@
+Ниже представлен **полный код** готового WPF-приложения, которое при нажатии на кнопку «Тук-тук» открывает второе окно с фразой «Кто там?» и **случайно** выбирает одно из трёх событий:
+
+- **Крик** (воспроизводится звук)
+- **Страшный GIF** (вместо анимации тряски – показывается анимированное изображение)
+- **Сообщение** (всплывает MessageBox)
+
+Всё оформлено в стиле детской страшилки. Вы можете заменить файл `scary.gif` на свой.
+
+---
+
+## 1. Установите NuGet-пакет `WpfAnimatedGif`
+Откройте **Консоль диспетчера пакетов** (Tools → NuGet Package Manager → Package Manager Console) и выполните:
+```
+Install-Package WpfAnimatedGif
+```
+Либо добавьте через менеджер пакетов вручную.
+
+---
+
+## 2. Добавьте GIF-файл в проект
+- Поместите файл `scary.gif` в корень проекта (или в папку `Resources`).
+- В свойствах файла укажите **Действие при сборке: Resource** (если файл лежит в корне, путь будет `"/scary.gif"`; если в папке – `"/Resources/scary.gif"`).
+
+---
+
+## 3. Полный код приложения
+
+### `MainWindow.xaml`
+```xml
+<Window x:Class="ScaryStory.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Страшная история" Height="350" Width="500"
+        WindowStartupLocation="CenterScreen"
+        Background="#FF1A1A1A">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="👻 СТРАШНАЯ ИСТОРИЯ 👻" 
+                   FontSize="28" FontWeight="Bold" Foreground="#FF8B0000"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontFamily="Courier New" TextEffects="Shadow"/>
+
+        <Button x:Name="KnockButton" Grid.Row="1" Content="Тук-тук" 
+                Width="200" Height="70" FontSize="24" FontWeight="Bold"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Background="#FF3D3D3D" Foreground="#FFE0E0E0"
+                BorderBrush="#FF8B0000" BorderThickness="3"
+                Click="KnockButton_Click">
+            <Button.Triggers>
+                <EventTrigger RoutedEvent="Button.MouseEnter">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Width" To="220" Duration="0:0:0.1"/>
+                            <DoubleAnimation Storyboard.TargetProperty="Height" To="80" Duration="0:0:0.1"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+                <EventTrigger RoutedEvent="Button.MouseLeave">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Width" To="200" Duration="0:0:0.1"/>
+                            <DoubleAnimation Storyboard.TargetProperty="Height" To="70" Duration="0:0:0.1"/>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Button.Triggers>
+        </Button>
+
+        <TextBlock Grid.Row="2" Text="🎃 🕸️ 🦇 🕷️ 🎃" 
+                   FontSize="18" Foreground="#FF5A5A5A"
+                   HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,20"/>
+    </Grid>
+</Window>
+```
+
+### `MainWindow.xaml.cs`
+```csharp
+using System;
+using System.Media;
+using System.Windows;
+
+namespace ScaryStory
+{
+    public partial class MainWindow : Window
+    {
+        private Random random = new Random();
+        private SecondWindow secondWindow;
+
+        public MainWindow()
+        {
+            InitializeComponent();
+        }
+
+        private void KnockButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (secondWindow == null || !secondWindow.IsVisible)
+            {
+                secondWindow = new SecondWindow();
+                secondWindow.Closed += (s, args) => secondWindow = null;
+                secondWindow.Show();
+            }
+
+            int scareType = random.Next(3);
+            switch (scareType)
+            {
+                case 0:
+                    PlayScream();
+                    break;
+                case 1:
+                    secondWindow.ShowScaryGif();  // Вместо анимации – GIF
+                    break;
+                case 2:
+                    ShowScaryMessage();
+                    break;
+            }
+        }
+
+        private void PlayScream()
+        {
+            try
+            {
+                SoundPlayer player = new SoundPlayer("scream.wav");
+                player.Play();
+            }
+            catch
+            {
+                SystemSounds.Beep.Play();
+            }
+        }
+
+        private void ShowScaryMessage()
+        {
+            MessageBox.Show("Бууууу! Напугался? 👻", "СТРАШНО!", 
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+}
+```
+
+---
+
+### `SecondWindow.xaml`
+```xml
+<Window x:Class="ScaryStory.SecondWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:gif="http://wpfanimatedgif.codeplex.com"
+        Title="Кто там?" Height="300" Width="400"
+        WindowStartupLocation="CenterOwner"
+        Background="#FF2A0A0A">
+    <Grid>
+        <!-- Текст "Кто там?" (показывается по умолчанию) -->
+        <TextBlock x:Name="QuestionText" Text="Кто там?" 
+                   FontSize="32" FontWeight="Bold" 
+                   Foreground="#FFFF4444"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontFamily="Comic Sans MS, Courier New"
+                   Visibility="Visible" />
+
+        <!-- GIF-изображение (скрыто, пока не вызовут) -->
+        <Image x:Name="GifImage" 
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               Visibility="Collapsed"
+               gif:ImageBehavior.AnimatedSource="{Binding}" 
+               gif:ImageBehavior.RepeatBehavior="1x" />
+
+        <TextBlock Text="👻" FontSize="48" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,10,10"/>
+    </Grid>
+</Window>
+```
+
+### `SecondWindow.xaml.cs`
+```csharp
+using System;
+using System.Windows;
+using System.Windows.Threading;
+using WpfAnimatedGif;
+
+namespace ScaryStory
+{
+    public partial class SecondWindow : Window
+    {
+        public SecondWindow()
+        {
+            InitializeComponent();
+        }
+
+        public void ShowScaryGif()
+        {
+            // Скрываем текст, показываем GIF
+            QuestionText.Visibility = Visibility.Collapsed;
+            GifImage.Visibility = Visibility.Visible;
+
+            // Загружаем GIF (измените путь, если файл лежит в папке)
+            var gifUri = new Uri("/scary.gif", UriKind.Relative);
+            ImageBehavior.SetAnimatedSource(GifImage, gifUri);
+
+            // Таймер для возврата к тексту после проигрыша GIF
+            DispatcherTimer timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(3); // подберите под длительность вашего GIF
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                QuestionText.Visibility = Visibility.Visible;
+                GifImage.Visibility = Visibility.Collapsed;
+                ImageBehavior.SetAnimatedSource(GifImage, null); // очищаем источник
+            };
+            timer.Start();
+        }
+    }
+}
+```
+
+---
+
+## 4. Как это работает
+- При первом нажатии «Тук-тук» открывается второе окно.
+- Затем случайно выбирается тип пугалки:
+  - **0** – воспроизводится звуковой файл `scream.wav` (если его нет, звучит системный бип).
+  - **1** – во втором окне вместо текста появляется анимированный GIF.
+  - **2** – появляется страшное сообщение.
+- GIF отображается в течение 3 секунд (можно изменить `timer.Interval`), после чего возвращается текст «Кто там?».
+
+---
+
+## 5. Важные замечания
+- Убедитесь, что файл `scary.gif` скопирован в папку с проектом и его **Действие при сборке** = `Resource`.
+- Если вы используете другое имя GIF, измените путь в `SecondWindow.xaml.cs`.
+- Для звука `scream.wav` положите файл в папку `bin\Debug\net8.0-windows\` (или в корень проекта с действием `Content` и копированием в выходную папку).
+- Проект должен ссылаться на `WpfAnimatedGif` – установите через NuGet.
+
+Теперь у вас есть полностью работающее приложение с заменой анимации на GIF!
