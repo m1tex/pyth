@@ -1,1 +1,1 @@
-Scaffold-DbContext "Host=pgadmin.lab;Port=5432;Database=isp-24-2-galov-kj;SearchPath=stroyKontrol;Username=isp-24-galov-kj;Password=13904"
+Scaffold-DbContext "Host=pgadmin.lab;Port=5432;Database=isp-24-2-galov-kj;SearchPath=stroyKontrol;Username=isp-24-galov-kj;Password=13904" Npgsql.EntityFrameworkCore.PostgreSQL
